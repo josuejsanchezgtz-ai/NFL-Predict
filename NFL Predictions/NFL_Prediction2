@@ -1,0 +1,219 @@
+<!Doctype html>
+<html lang="eng">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>NFL Prediction Demo</title>
+        <link rel="stylesheet" type="text/css" href="NFL.css">
+        <link rel="icon" type="image/x-icon" href="">
+        <link rel="stylesheet" href="NFL.css">
+    </head>
+    <body class="diagonal-background">
+
+        <div class="container">
+            <h1 id="center">NFL Game Outcome Prediction</h1>
+        <div id="logo-wrapper">
+        <img src="NFL-Logo.png" alt="NFL-logo" id="nfl-logo">
+        </div>
+
+            <div id="instructions">
+        <h2>How to use the prediction boxes</h2>
+    <ul>
+            <li>Select a season year between 2003 and 2023 for your prediction.</li>
+        <li>Type the name of an NFL team into each box where it says "Input a Team".</li>
+        <li>Click the "Compare" button.</li>
+        <li>The site will show each team&apos;s win percentage and which team was more likely to win during the season.</li>
+    </ul>
+    </div>
+
+        <div class="team" id="team1">
+        <h2>Input a Team</h2>
+        <input id="team1-input" type="text" placeholder="Input a Team">
+    </div>
+
+    <div class="team" id="team2">
+        <h2>Input a Team</h2>
+        <input id="team2-input" type="text" placeholder="Input a Team">
+    </div>
+            
+        <div id="year-selector">
+        <label for="year-input">Season year:</label>
+        <input id="year-input" type="number" min="2003" max="2023" value="2023">
+        </div>
+
+
+    <button id="compare-button" onclick="compareTeams()">Compare</button>
+        <div id="result"></div>
+        <div id="team-stats"></div>
+
+        <script>
+            let teamData = [];
+
+            const TEAM_ALIASES = {
+  cowboys: "Dallas Cowboys",
+  ravens: "Baltimore Ravens",
+  pats: "New England Patriots",
+  patriots: "New England Patriots",
+  niners: "San Francisco 49ers",
+  "49ers": "San Francisco 49ers",
+  "49 niners": "San Francisco 49ers",
+  "49-ers": "San Francisco 49ers",
+  chiefs: "Kansas City Chiefs",
+  packers: "Green Bay Packers",
+  steelers: "Pittsburgh Steelers",
+  broncos: "Denver Broncos",
+  chargers: "Chargers",
+  "san diego chargers": "Chargers",
+  "los angeles chargers": "Chargers",
+  "la chargers": "Chargers",   
+  texans: "Houston Texans",
+  dolphins: "Miami Dolphins",
+  eagles: "Philadelphia Eagles",
+  giants: "New York Giants",
+  jets: "New York Jets",
+  bills: "Buffalo Bills",
+  colts: "Indianapolis Colts",
+  jags: "Jacksonville Jaguars",
+  jaguars: "Jacksonville Jaguars",
+  bengals: "Cincinnati Bengals",
+  browns: "Cleveland Browns",
+  bears: "Chicago Bears",
+  lions: "Detroit Lions",
+  vikings: "Minnesota Vikings",
+  saints: "New Orleans Saints",
+  seahawks: "Seattle Seahawks",
+  falcons: "Atlanta Falcons",
+  panthers: "Carolina Panthers",
+  bucs: "Tampa Bay Buccaneers",
+  buccaneers: "Tampa Bay Buccaneers",
+  raiders: "Raiders",
+  "las vegas raiders": "Raiders",
+  "oakland raiders": "Raiders",
+  rams: "St. Louis Rams"            
+};
+
+            async function loadCsv() {
+            const res = await fetch('team_stats_2003_2023.csv');
+            const text = await res.text();
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',');
+
+            teamData = lines.slice(1).map(line => {
+                const cols = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => obj[h] = cols[i]);
+                return obj;
+            });
+            }
+
+            function calcWinPct(teamName, year) {
+  if (!teamName) return null;
+
+  const raw = teamName.trim().toLowerCase();
+  const normalized = TEAM_ALIASES[raw] || teamName;
+
+  let rows;
+  if (normalized.toLowerCase() === "raiders") {
+    rows = teamData.filter(r =>
+      r.team.toLowerCase() === "oakland raiders" ||
+      r.team.toLowerCase() === "las vegas raiders"
+    );
+  } else if (normalized.toLowerCase() === "chargers") {
+    rows = teamData.filter(r =>
+      r.team.toLowerCase() === "san diego chargers" ||
+      r.team.toLowerCase() === "los angeles chargers"
+    );
+  } else {
+    rows = teamData.filter(
+      r => r.team.toLowerCase() === normalized.toLowerCase()
+    );
+  }
+
+  if (!rows.length) return null;
+
+  let row;
+  if (year) {
+    // Try to find that specific season
+    row = rows.find(r => Number(r.year) === Number(year));
+  }
+  if (!row) {
+    // Fallback: use latest season available
+    row = rows.reduce((a, b) => (+a.year > +b.year ? a : b));
+  }
+
+  const wins = Number(row.wins);
+  const losses = Number(row.losses);
+  const ties = row.ties ? Number(row.ties) : 0;
+  const games = wins + losses + ties;
+  if (!games) return null;
+
+  return (wins + 0.5 * ties) / games * 100;
+}
+
+
+
+            async function compareTeams() {
+  if (!teamData.length) await loadCsv();
+
+  const input1 = document.getElementById('team1-input');
+  const input2 = document.getElementById('team2-input');
+  const yearInput = document.getElementById('year-input');
+  const out = document.getElementById('result');
+
+  const t1 = input1.value;
+  const t2 = input2.value;
+  const yearValue = yearInput.value ? Number(yearInput.value) : null;
+
+  // Clear previous error state
+  input1.classList.remove('error');
+  input2.classList.remove('error');
+  yearInput.classList.remove('error');
+
+  // Year range check
+  if (!yearValue || yearValue < 2003 || yearValue > 2023) {
+    yearInput.classList.add('error');
+    out.textContent = 'Please enter a season year between 2003 and 2023.';
+    return;
+  }
+
+  const p1 = calcWinPct(t1, yearValue);
+  const p2 = calcWinPct(t2, yearValue);
+
+  if (p1 == null || p2 == null) {
+    if (p1 == null) input1.classList.add('error');
+    if (p2 == null) input2.classList.add('error');
+    out.textContent = 'One or both teams were not found for that season.';
+    return;
+  }
+
+  const p1Str = p1.toFixed(1) + '%';
+  const p2Str = p2.toFixed(1) + '%';
+
+  let winner = 'They are tied.';
+  if (p1 > p2) winner = `${t1} is more likely to win.`;
+  else if (p2 > p1) winner = `${t2} is more likely to win.`;
+
+  out.textContent = `Year ${yearValue} — ${t1}: ${p1Str} | ${t2}: ${p2Str} → ${winner}`;
+}
+
+function attachEnterHandlers() {
+  const team1Input = document.getElementById('team1-input');
+  const team2Input = document.getElementById('team2-input');
+  const yearInput  = document.getElementById('year-input');
+
+  [team1Input, team2Input, yearInput].forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        compareTeams();
+      }
+    });
+  });
+}
+
+loadCsv();
+attachEnterHandlers();
+
+        </script>
+        </div>
+    </body>
+</html>
